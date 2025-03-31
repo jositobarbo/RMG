@@ -37,3 +37,26 @@ def verificar_usuario(username, password):
     data = cursor.fetchone()
     conn.close()
     return data is not None and data[0] == hashed
+
+def obtener_todos_los_usuarios():
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM usuarios")
+    usuarios = cursor.fetchall()
+    conn.close()
+    return [u[0] for u in usuarios]
+
+def cambiar_contrasena(username, nueva_contrasena):
+    hashed = hash_password(nueva_contrasena)
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET password = ? WHERE username = ?", (hashed, username))
+    conn.commit()
+    conn.close()
+
+def eliminar_usuario(username):
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM usuarios WHERE username = ?", (username,))
+    conn.commit()
+    conn.close()
