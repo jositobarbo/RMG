@@ -127,3 +127,60 @@ def obtener_escandallo_completo(receta_id):
         "ingredientes": ingredientes,
         "precio_sugerido": total_coste / (1 - margen) if margen < 1 else 0
     }
+
+def obtener_resumen_recetas():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, nombre, margen_objetivo FROM Recetas")
+    recetas = cursor.fetchall()
+
+    resumen = []
+
+    for receta_id, nombre, margen_obj in recetas:
+        # Obtener ingredientes
+        cursor.execute("""
+            SELECT ri.cantidad, i.coste_unitario
+            FROM RecetaIngredientes ri
+            JOIN Ingredientes i ON ri.ingrediente_id = i.id
+            WHERE ri.receta_id = ?
+        """, (receta_id,))
+        ingredientes = cursor.fetchall()
+
+        coste_total = sum(c * u for c, u in ingredientes)
+        precio_sugerido = coste_total / (1 - margen_obj) if margen_obj < 1 else 0
+        margen_real = (precio_sugerido - coste_total) / precio_sugerido if precio_sugerido else 0
+
+        resumen.append({
+            "nombre": nombre,
+            "coste_total": round(coste_total, 2),
+            "precio_sugerido": round(precio_sugerido, 2),
+            "margen_real": round(margen_real * 100, 2)
+        })
+
+    conn.close()
+    return resumen
+
+from fpdf import FPDF
+
+def exportar_escandallo_a_pdf(data, filename):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    pdf.cell(200, 10, txt=f"Escandallo: {data['receta']}", ln=True, align='C')
+    pdf.ln(10)
+    pdf.cell(200, 10, txt=f"Margen objetivo: {round(data['margen']*100, 2)}%", ln=True)
+    pdf.cell(200, 10, txt=f"Coste total: {round(data['coste_total'], 2)} €", ln=True)
+    pdf.cell(200, 10, txt=f"Precio sugerido: {round(data['precio_sugerido'], 2)} €", ln=True)
+    pdf.ln(10)
+
+    pdf.set_font("Arial", 'B', size=12)
+    pdf.cell(0, 10, "Ingredientes:", ln=True)
+
+    pdf.set_font("Arial", size=11)
+    for nombre, cantidad, unidad, precio, coste in data["ingredientes"]:
+        linea = f"- {nombre}: {cantidad} {unidad} × {precio:.2f} € = {coste:.2f} €"
+        pdf.cell(0, 10, linea, ln=True)
+
+    pdf.output(filename)
