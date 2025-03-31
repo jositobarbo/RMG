@@ -5,6 +5,7 @@ import streamlit as st
 from auth import crear_tabla_usuarios, registrar_usuario, verificar_usuario
 from scripts.ingredientes import insertar_ingrediente, actualizar_precio_ingrediente
 from scripts.recetas import insertar_receta, asociar_ingrediente_a_receta, obtener_id_receta_por_nombre, calcular_precio_receta, listar_recetas
+from scripts.ingredientes import actualizar_stock_ingrediente, obtener_stock_ingrediente
 
 
 st.set_page_config(page_title="RMG - Escandallos Dinámicos", layout="centered")
@@ -40,6 +41,13 @@ elif eleccion == "Inicio de sesión":
             st.error("Credenciales incorrectas")
 
 if st.session_state.logged_in:
+    if st.session_state.user == "jose":
+        st.sidebar.markdown("### 👑 Admin")
+        if st.sidebar.button("🛠 Panel de usuarios"):
+            st.session_state.panel_usuarios = True
+    else:
+        st.session_state.panel_usuarios = False
+
     st.sidebar.success(f"Sesión iniciada como {st.session_state.user}")
     # Aquí iría tu sistema de escandallos personalizado para ese usuario
     
@@ -56,6 +64,7 @@ if st.session_state.logged_in:
         "📤 Exportar escandallo a Excel",  # <-- Nueva opción
         "🔄 Actualizar precio de ingrediente",
         "🖨️ Exportar escandallo a PDF",
+        "📦 Gestionar stock",
         "📋 Ver recetas"
     ])
 
@@ -120,6 +129,29 @@ if st.session_state.logged_in:
         ingrediente_seleccionado = st.selectbox("Selecciona un ingrediente", ingredientes, format_func=lambda x: x[1])
 
         cantidad = st.number_input("Cantidad utilizada (en la unidad correspondiente)", min_value=0.0, format="%.2f")
+    
+    elif menu == "📦 Gestionar stock":
+    
+        st.header("📦 Gestión de stock de ingredientes")
+
+        # Obtener ingredientes
+        conn = sqlite3.connect("db/escandallos.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT nombre FROM Ingredientes")
+        ingredientes = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+        ingrediente = st.selectbox("Selecciona un ingrediente", ingredientes)
+
+        stock_actual = obtener_stock_ingrediente(ingrediente)
+        st.info(f"Stock actual: **{stock_actual:.2f}** unidades")
+
+        nuevo_stock = st.number_input("Nuevo stock", min_value=0.0, value=stock_actual, format="%.2f")
+
+        if st.button("Actualizar stock"):
+        actualizar_stock_ingrediente(ingrediente, nuevo_stock)
+        st.success(f"Stock de '{ingrediente}' actualizado a {nuevo_stock:.2f}")
+
 
         if st.button("Añadir a la receta"):
             receta_id = receta_seleccionada[0]
@@ -232,3 +264,25 @@ if st.session_state.logged_in:
             st.success(f"Escandallo exportado como: {nombre_archivo}")
             with open(nombre_archivo, "rb") as file:
                 st.download_button("📥 Descargar PDF", file, file_name=nombre_archivo)
+                
+# ----- PANEL DE ADMINISTRACIÓN -----
+if st.session_state.get("panel_usuarios", False):
+    st.header("🛠 Panel de Administración de Usuarios")
+
+    usuarios = obtener_todos_los_usuarios()
+
+    for user in usuarios:
+        col1, col2, col3 = st.columns([3, 3, 2])
+        with col1:
+            st.markdown(f"👤 **{user}**")
+        with col2:
+            nueva_pwd = st.text_input(f"🔐 Nueva contraseña para {user}", key=f"pwd_{user}")
+            if nueva_pwd:
+                cambiar_contrasena(user, nueva_pwd)
+                st.success(f"Contraseña de {user} actualizada.")
+        with col3:
+            if user != st.session_state.user:
+                if st.button("🗑 Eliminar", key=f"del_{user}"):
+                    eliminar_usuario(user)
+                    st.warning(f"Usuario {user} eliminado.")
+
