@@ -34,3 +34,17 @@ def actualizar_precio_ingrediente(nombre_ingrediente, nuevo_precio):
     conn.commit()
     conn.close()
 
+def actualizar_stock_ingrediente(nombre, nuevo_stock):
+    conn = sqlite3.connect("db/escandallos.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE Ingredientes SET stock = ? WHERE nombre = ?", (nuevo_stock, nombre))
+    conn.commit()
+    conn.close()
+
+def obtener_stock_ingrediente(nombre):
+    conn = sqlite3.connect("db/escandallos.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT stock FROM Ingredientes WHERE nombre = ?", (nombre,))
+    resultado = cursor.fetchone()
+    conn.close()
+    return resultado[0] if resultado else 0
