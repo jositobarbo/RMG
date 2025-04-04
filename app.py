@@ -6,6 +6,8 @@ from auth import crear_tabla_usuarios, registrar_usuario, verificar_usuario
 from scripts.ingredientes import insertar_ingrediente, actualizar_precio_ingrediente
 from scripts.recetas import insertar_receta, asociar_ingrediente_a_receta, obtener_id_receta_por_nombre, calcular_precio_receta, listar_recetas
 from scripts.ingredientes import actualizar_stock_ingrediente, obtener_stock_ingrediente
+from scripts.ingredientes import crear_tabla_movimientos_stock 
+crear_tabla_movimientos_stock()
 
 
 st.set_page_config(page_title="RMG - Escandallos Dinámicos", layout="centered")
@@ -65,6 +67,7 @@ if st.session_state.logged_in:
         "🔄 Actualizar precio de ingrediente",
         "🖨️ Exportar escandallo a PDF",
         "📦 Gestionar stock",
+        "📜 Historial de stock",
         "📋 Ver recetas"
     ])
 
@@ -148,16 +151,16 @@ if st.session_state.logged_in:
         nuevo_stock = st.number_input("Nuevo stock", min_value=0.0, value=stock_actual, format="%.2f")
 
         if st.button("Actualizar stock"):
-            actualizar_stock_ingrediente(ingrediente, nuevo_stock)
+            observacion = st.text_input("Observación (opcional)", key="obs_stock")
+            actualizar_stock_ingrediente(ingrediente, nuevo_stock, st.session_state.user, observacion)
             st.success(f"Stock de '{ingrediente}' actualizado a {nuevo_stock:.2f} unidades.")
 
+            ingrediente = st.selectbox("Selecciona un ingrediente", ingredientes)
 
-        ingrediente = st.selectbox("Selecciona un ingrediente", ingredientes)
+            stock_actual = obtener_stock_ingrediente(ingrediente)
+            st.info(f"Stock actual: **{stock_actual:.2f}** unidades")
 
-        stock_actual = obtener_stock_ingrediente(ingrediente)
-        st.info(f"Stock actual: **{stock_actual:.2f}** unidades")
-
-        nuevo_stock = st.number_input("Nuevo stock", min_value=0.0, value=stock_actual, format="%.2f")
+            nuevo_stock = st.number_input("Nuevo stock", min_value=0.0, value=stock_actual, format="%.2f")
 
         if st.button("Actualizar stock"):
                 actualizar_stock_ingrediente(ingrediente, nuevo_stock)
@@ -275,6 +278,68 @@ if st.session_state.logged_in:
             st.success(f"Escandallo exportado como: {nombre_archivo}")
             with open(nombre_archivo, "rb") as file:
                 st.download_button("📥 Descargar PDF", file, file_name=nombre_archivo)
+                
+    elif menu == "📜 Historial de stock":
+        st.header("📜 Historial de movimientos de stock")
+
+        # Obtener datos de movimientos
+        conn = sqlite3.connect("db/escandallos.db")
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT ingrediente, usuario, cantidad_anterior, cantidad_nueva, fecha, observacion
+            FROM MovimientosStock
+            ORDER BY fecha DESC
+        """)
+        movimientos = cursor.fetchall()
+        conn.close()
+
+        from datetime import datetime
+
+        # Convertir a DataFrame
+        df = pd.DataFrame(movimientos, columns=[
+            "Ingrediente", "Usuario", "Stock anterior", "Stock nuevo", "Fecha", "Observación"
+        ])
+
+        # Convertir fecha a tipo datetime
+        df["Fecha"] = pd.to_datetime(df["Fecha"])
+
+        # Filtros
+        ingredientes = df["Ingrediente"].unique()
+        usuarios = df["Usuario"].unique()
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            filtro_ingrediente = st.selectbox("🔎 Filtrar por ingrediente", ["Todos"] + list(ingredientes))
+        with col2:
+            filtro_usuario = st.selectbox("👤 Filtrar por usuario", ["Todos"] + list(usuarios))
+        with col3:
+            fechas = df["Fecha"]
+            fecha_min, fecha_max = fechas.min().date(), fechas.max().date()
+            rango_fechas = st.date_input("📅 Rango de fechas", (fecha_min, fecha_max))
+
+        # Aplicar filtros
+        if filtro_ingrediente != "Todos":
+            df = df[df["Ingrediente"] == filtro_ingrediente]
+        if filtro_usuario != "Todos":
+            df = df[df["Usuario"] == filtro_usuario]
+        if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
+            start_date, end_date = rango_fechas
+            df = df[(df["Fecha"].dt.date >= start_date) & (df["Fecha"].dt.date <= end_date)]
+
+        # Mostrar resultados
+        st.dataframe(df, use_container_width=True)
+
+        # Descargar historial filtrado a Excel
+        if not df.empty:
+            nombre_archivo = "historial_stock.xlsx"
+            df.to_excel(nombre_archivo, index=False)
+
+            with open(nombre_archivo, "rb") as file:
+                st.download_button("📥 Descargar Excel", file, file_name=nombre_archivo)
+        else:
+            st.info("No hay movimientos que coincidan con los filtros.")
+
+
                 
 # ----- PANEL DE ADMINISTRACIÓN -----
 if st.session_state.get("panel_usuarios", False):

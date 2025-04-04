@@ -1,5 +1,8 @@
 import sqlite3
 from pathlib import Path
+from datetime import datetime
+from scripts.ingredientes import obtener_stock_ingrediente, registrar_movimiento_stock
+
 
 DB_PATH = Path("db/escandallos.db")
 
@@ -34,12 +37,17 @@ def actualizar_precio_ingrediente(nombre_ingrediente, nuevo_precio):
     conn.commit()
     conn.close()
 
-def actualizar_stock_ingrediente(nombre, nuevo_stock):
+def actualizar_stock_ingrediente(nombre, nuevo_stock, usuario, observacion=""):
+    stock_actual = obtener_stock_ingrediente(nombre)
+
     conn = sqlite3.connect("db/escandallos.db")
     cursor = conn.cursor()
     cursor.execute("UPDATE Ingredientes SET stock = ? WHERE nombre = ?", (nuevo_stock, nombre))
     conn.commit()
     conn.close()
+
+    # Registrar el movimiento
+    registrar_movimiento_stock(nombre, usuario, stock_actual, nuevo_stock, observacion)
 
 def obtener_stock_ingrediente(nombre):
     conn = sqlite3.connect("db/escandallos.db")
@@ -48,3 +56,32 @@ def obtener_stock_ingrediente(nombre):
     resultado = cursor.fetchone()
     conn.close()
     return resultado[0] if resultado else 0
+
+def crear_tabla_movimientos_stock():
+    conn = sqlite3.connect("db/escandallos.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS MovimientosStock (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ingrediente TEXT,
+            usuario TEXT,
+            cantidad_anterior REAL,
+            cantidad_nueva REAL,
+            fecha TEXT,
+            observacion TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+    
+def registrar_movimiento_stock(ingrediente, usuario, cantidad_anterior, cantidad_nueva, observacion=""):
+    conn = sqlite3.connect("db/escandallos.db")
+    cursor = conn.cursor()
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO MovimientosStock (ingrediente, usuario, cantidad_anterior, cantidad_nueva, fecha, observacion)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (ingrediente, usuario, cantidad_anterior, cantidad_nueva, fecha, observacion))
+    conn.commit()
+    conn.close()
+
