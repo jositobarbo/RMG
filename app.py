@@ -131,7 +131,6 @@ if st.session_state.logged_in:
         cantidad = st.number_input("Cantidad utilizada (en la unidad correspondiente)", min_value=0.0, format="%.2f")
     
     elif menu == "📦 Gestionar stock":
-    
         st.header("📦 Gestión de stock de ingredientes")
 
         # Obtener ingredientes
@@ -149,8 +148,20 @@ if st.session_state.logged_in:
         nuevo_stock = st.number_input("Nuevo stock", min_value=0.0, value=stock_actual, format="%.2f")
 
         if st.button("Actualizar stock"):
-        actualizar_stock_ingrediente(ingrediente, nuevo_stock)
-        st.success(f"Stock de '{ingrediente}' actualizado a {nuevo_stock:.2f}")
+            actualizar_stock_ingrediente(ingrediente, nuevo_stock)
+            st.success(f"Stock de '{ingrediente}' actualizado a {nuevo_stock:.2f} unidades.")
+
+
+        ingrediente = st.selectbox("Selecciona un ingrediente", ingredientes)
+
+        stock_actual = obtener_stock_ingrediente(ingrediente)
+        st.info(f"Stock actual: **{stock_actual:.2f}** unidades")
+
+        nuevo_stock = st.number_input("Nuevo stock", min_value=0.0, value=stock_actual, format="%.2f")
+
+        if st.button("Actualizar stock"):
+                actualizar_stock_ingrediente(ingrediente, nuevo_stock)
+                st.success(f"Stock de '{ingrediente}' actualizado a {nuevo_stock:.2f}")
 
 
         if st.button("Añadir a la receta"):
