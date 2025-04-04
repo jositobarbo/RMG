@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 from datetime import datetime
-from scripts.ingredientes import obtener_stock_ingrediente, registrar_movimiento_stock
+
 
 
 DB_PATH = Path("db/escandallos.db")
